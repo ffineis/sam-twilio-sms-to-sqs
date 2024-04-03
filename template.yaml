@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  python3.10
+
+  Sample SAM Template for sam-twilio-sms
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Parameters:
+  AppEnv:
+    Type: String
+    Description: The deployment environment (e.g., dev, staging, prod)
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+
+  HttpApiForTwilio:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref AppEnv
+
+  SMSToSQSFn:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      FunctionName: !Sub 'SMSToSQSFn-${AppEnv}'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      PackageType: Image
+      Architectures:
+      - x86_64
+      Events:
+        ApiPostSMS:
+          Type: HttpApi
+          Properties:
+            Path: /sms
+            Method: post
+            ApiId:
+              Ref: HttpApiForTwilio
+      Environment:
+        Variables:
+          SQS_QUEUE_URL: !Ref TwilioSMSQueue
+
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./sms_to_sqs
+      DockerTag: python3.10-v1
+
+  TwilioSMSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'TwilioSMSQueue-${AppEnv}'
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: LambdaCloudWatchLoggingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+        - PolicyName: LambdaSQSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  Fn::GetAtt: [ TwilioSMSQueue, Arn ]
+
+Outputs:
+  TwilioAPI:
+    Description: "API Gateway endpoint URL for AppEnv stage. Hosts /sms endpoint routing to SMSToSQSFn function"
+    Value: !Sub "https://${HttpApiForTwilio}.execute-api.${AWS::Region}.amazonaws.com/${AppEnv}/sms/"
+  SMSToSQSFunction:
+    Description: "Twilio SMS-to-SQS Lambda handler ARN"
+    Value: !GetAtt SMSToSQSFn.Arn
+  SQSQueueURL:
+    Description: SQS queue URL
+    Value: !Ref TwilioSMSQueue
