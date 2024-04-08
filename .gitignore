@@ -100,13 +100,18 @@ fabric.properties
 ### PyCharm Patch ###
 # Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
 
-# *.iml
-# modules.xml
-# .idea/misc.xml
-# *.ipr
+*.iml
+modules.xml
+.idea/modules.xml
+.idea/misc.xml
+*.ipr
 
 # Sonarlint plugin
 .idea/sonarlint
+
+.idea/.gitignore
+.idea/vcs.xml
+.idea/inspectionProfiles
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -241,4 +246,5 @@ $RECYCLE.BIN/
 
 */build/*
 
-# End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
+# AWS SAM
+.aws-sam
