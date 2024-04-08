@@ -87,6 +87,15 @@ Resources:
                   - sqs:SendMessage
                 Resource:
                   Fn::GetAtt: [ TwilioSMSQueue, Arn ]
+        - PolicyName: LambdaSecretsManagerAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:twilio-sms-to-sqs-*'
 
 Outputs:
   TwilioAPI:
