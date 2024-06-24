@@ -6,12 +6,12 @@ process the message, perhaps responding to the user or triggering some other act
 
 The application is built using the AWS Serverless Application Model (AWS SAM) and can be deployed to AWS using the SAM CLI.
 
-You 
-
 - `sms_to_sqs` - Python source code for the application's Lambda function.
 - `samconfig.toml` - specs for the CloudFormation stack that SAM manages for us.
 - `template.yaml` - SAM application resources. Defines an API Gateway, a Lambda function, an SQS FIFO queue, and relevant IAM permissions.
 - tests - Unit tests for the application code. 
+
+![AWS Architecture](static/aws_arch.png)
 
 ## Deployment
 
