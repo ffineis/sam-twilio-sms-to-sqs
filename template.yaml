@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   python3.10
 
-  Sample SAM Template for sam-twilio-sms
+  SAM Template for sam-twilio-sms
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -19,6 +19,9 @@ Parameters:
       - dev
       - staging
       - prod
+  TwilioSecretName:
+    Type: String
+    Description: Name of the secret in AWS Secrets Manager where Twilio credentials are stored.
 
 Resources:
 
@@ -46,6 +49,7 @@ Resources:
       Environment:
         Variables:
           SQS_QUEUE_URL: !Ref TwilioSMSQueue
+          TWILIO_SECRET_NAME: !Ref TwilioSecretName
 
     Metadata:
       Dockerfile: Dockerfile
@@ -55,7 +59,10 @@ Resources:
   TwilioSMSQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub 'TwilioSMSQueue-${AppEnv}'
+      QueueName: !Sub 'TwilioSMSQueue-${AppEnv}.fifo'
+      FifoQueue: true
+      ContentBasedDeduplication: false
+      MessageRetentionPeriod: 7200 # 2 hours
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -95,11 +102,11 @@ Resources:
                 Action:
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
-                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:twilio-sms-to-sqs-*'
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${TwilioSecretName}*'
 
 Outputs:
   TwilioAPI:
-    Description: "API Gateway endpoint URL for AppEnv stage. Hosts /sms endpoint routing to SMSToSQSFn function"
+    Description: "API Gateway endpoint URL for AppEnv stage. Hosts /sms endpoint routing to SMSToSQSFn."
     Value: !Sub "https://${HttpApiForTwilio}.execute-api.${AWS::Region}.amazonaws.com/${AppEnv}/sms/"
   SMSToSQSFunction:
     Description: "Twilio SMS-to-SQS Lambda handler ARN"

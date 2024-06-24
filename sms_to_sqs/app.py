@@ -1,7 +1,10 @@
 import base64
+import hashlib
+import uuid
 import os
 import json
 import boto3
+import time
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
 from urllib.parse import parse_qs
@@ -97,7 +100,7 @@ def lambda_handler(event, context):
             Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
     """
 
-    secrets = load_twilio_secrets("twilio-sms-to-sqs")
+    secrets = load_twilio_secrets(os.environ["TWILIO_SECRET_NAME"])
     try:
         # -- validate the request
         if not validate_sms_from_twilio(event, auth_token=secrets["TWILIO_AUTH_TOKEN"]):
@@ -112,21 +115,24 @@ def lambda_handler(event, context):
     twilio_phone_number = message_data["To"]
     message_text = message_data["Body"]
 
+    # -- create deduplication ID.
+    hash_items = [message_text, str(int(time.time()))]
+    hashed_combined_string = hashlib.sha256(", ".join(hash_items).encode("utf-8")).digest()
+    deduplication_id = str(uuid.UUID(bytes=hashed_combined_string[:16]))
+
     sqs_message = {
-        "from": from_number,
+        "from_": from_number,
         "to": twilio_phone_number,
         "text": message_text
     }
 
-    # -- send message to SQS
+    # -- send message to SQS FIFO queue with deduplication parameters.
     queue_url = os.environ.get("SQS_QUEUE_URL")
     SQS_CLIENT.send_message(
         QueueUrl=queue_url,
-        MessageBody=json.dumps(sqs_message)
+        MessageBody=json.dumps(sqs_message),
+        MessageDeduplicationId=deduplication_id,
+        MessageGroupId=from_number
     )
-
-    # -- respond TO number we received message FROM. (just a test).
-    # send_sms(body="Hi from twilio!", recipient=from_number, sender=twilio_phone_number,
-    #          account_sid=secrets["TWILIO_ACCOUNT_SID"], auth_token=secrets["TWILIO_AUTH_TOKEN"])
 
     return {"status_code": 200, "body": f"Hello from {from_number}! Received: {message_text}"}
